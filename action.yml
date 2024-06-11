@@ -1,0 +1,32 @@
+name: nx-affected
+description: for setting up node
+
+outputs:
+  affected_projects:
+    description: "Affected projects"
+    value: ${{ steps.check_affected.outputs.affected_projects }}
+  has_affected:
+    description: "Has affected projects"
+    value: ${{ steps.check_affected.outputs.has_affected }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch all history for all tags and branches
+      shell: bash
+      run: git fetch --unshallow
+
+    - name: Check affected
+      id: check_affected
+      shell: bash
+      run: |
+        npx --version
+        npx nx show projects --affected --base=HEAD~1 --json --withTarget=build > .affected-projects.json
+        if [[ -s .affected-projects.json ]] && ! grep -q '\[\]' .affected-projects.json; then
+          echo "has_affected=true" >> $GITHUB_OUTPUT
+          cat .affected-projects.json
+          echo "affected_projects=$(cat .affected-projects.json)" >> $GITHUB_OUTPUT
+        else
+          echo "has_affected=false" >> $GITHUB_OUTPUT
+          echo "No affected projects. Cancelling workflow."
+        fi
