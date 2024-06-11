@@ -1,67 +1,18 @@
-name: Argo Deploying
-description: Deploying to k8s
+name: Notify
+description: Notify when build success
 
 inputs:
-  project_folder:
-    description: "Project folder"
-    required: true
-  github_access:
-    description: "Github access"
-    required: true
   image_name:
-    description: "Image name"
-    required: true
-  deployment_file:
-    description: "Deployment file"
-    required: true
-  pod_name:
-    description: "Pod name"
-    required: true
-  yq_version:
-    description: "yq version"
-    required: false
-    default: "4.43.1"
-
-outputs:
-  deployment_file: 
-    description: "Deployment file path"
-    value: ${{ inputs.deployment_file }}
-  image_name:
-    description: "Image name" 
-    value: ${{ inputs.image_name }}
-  pod_name: 
-    description: "Pod name"
-    value: ${{ inputs.pod_name }}
+    description: "Affected projects"
 
 runs:
   using: "composite"
   steps:
-  - name: Install yq
-    shell: bash
-    run: |
-      sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v${{ inputs.yq_version }}/yq_linux_amd64
-      sudo chmod +x /usr/local/bin/yq
-
-  - name: Update k8s deployment
-    shell: bash
-    run: |
-      rm -rf infra
-      /usr/bin/git config --global --add safe.directory /home/runner/work/${{ inputs.project_folder }}/${{ inputs.project_folder }}/infra
-      /usr/bin/git config --global --add safe.directory /home/runner/work/${{ inputs.project_folder }}/infra
-      
-      echo "Cloning infra..."
-      export GITH_ACCESS_KEY="${{ inputs.github_access }}"
-      git clone https://$GITH_ACCESS_KEY@github.com/quangdhdev/infra.git infra
-      cd infra
-      
-      echo ${{ inputs.image_name}}
-      export DEPLOYMENT_FILE="${{ inputs.deployment_file }}"
-      export IMAGE_NAME="${{ inputs.image_name }}"
-      export POD_NAME="${{ inputs.pod_name }}"
-      /usr/local/bin/yq e -i '(select(.spec.template.spec.containers[].name == strenv(POD_NAME)) | .spec.template.spec.containers[].image) = strenv(IMAGE_NAME)' $DEPLOYMENT_FILE
-
-      git config --global user.email "devopt-bot@quangdh.dev"
-      git config --global user.name "devopt-bot"
-      git add $DEPLOYMENT_FILE
-      git commit -m "Update deployment to ${IMAGE_NAME}"
-      git push
+  - name: Discord notification
+    env:
+      DISCORD_WEBHOOK: ${{ env.DISCORD_WEBHOOK }}
+      DISCORD_USERNAME: Phuong Anh Le
+      DISCORD_AVATAR: https://media1.nguoiduatin.vn/m24/upload/4-2022/images/2022-10-31/lephuonganh9-1667200915-17-width650height867.jpg
+    uses: Ilshidur/action-discord@master
+    with:
+      args: "Has a updated for ${{ inputs.image_name }}"
