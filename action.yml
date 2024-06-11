@@ -1,57 +1,67 @@
-name: Docker Hub - Building
-description: for building
+name: Argo Deploying
+description: Deploying to k8s
 
 inputs:
-  docker_username:
-    description: "Docker username"
+  project_folder:
+    description: "Project folder"
     required: true
-  docker_password:
-    description: "Docker password"
+  github_access:
+    description: "Github access"
     required: true
-  target_build:
-    description: "Target build"
-    required: true
-  # docker_file:
-  #   description: "Docker file"
-  #   required: false
-
-outputs:
   image_name:
     description: "Image name"
-    value: ${{ steps.dist.outputs.image_name }}
+    required: true
+  deployment_file:
+    description: "Deployment file"
+    required: true
+  pod_name:
+    description: "Pod name"
+    required: true
+  yq_version:
+    description: "yq version"
+    required: false
+    default: "4.43.1"
+
+outputs:
+  deployment_file: 
+    description: "Deployment file path"
+    value: ${{ inputs.deployment_file }}
+  image_name:
+    description: "Image name" 
+    value: ${{ inputs.image_name }}
+  pod_name: 
+    description: "Pod name"
+    value: ${{ inputs.pod_name }}
 
 runs:
   using: "composite"
   steps:
-  - name: Login to DockerHub
-    uses: docker/login-action@v1 
-    with:
-      username: ${{ inputs.docker_username }}
-      password: ${{ inputs.docker_password }}
-  
-  - name: Docker meta
-    id: meta
-    uses: docker/metadata-action@v5
-    with:
-      tags: |
-        type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
-
-  - name: Set image name
+  - name: Install yq
     shell: bash
-    id: dist
     run: |
-      echo "image_name=${{inputs.docker_username}}/${{ inputs.target_build }}:${{ steps.meta.outputs.tags }}" >> $GITHUB_OUTPUT
-    
-  - name: Build Docker images
-    shell: bash
-    run: npx nx build:docker ${{ inputs.target_build }} --args="--IMAGE_HOST=${{ inputs.docker_username }} --IMAGE_TAG=${{ steps.meta.outputs.tags }}"
-  
-  # - name: Build and push Docker image
-  #   uses: docker/build-push-action@v5
-  #   id: dist
-  #   with:
-  #     context: ${{ inputs.docker_file }}
-  #     push: true
-  #     tags: ${{ steps.name.outputs.image_name }}
+      sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v${{ inputs.yq_version }}/yq_linux_amd64
+      sudo chmod +x /usr/local/bin/yq
 
-  
+  - name: Update k8s deployment
+    shell: bash
+    run: |
+      rm -rf infra
+      /usr/bin/git config --global --add safe.directory /home/runner/work/${{ inputs.project_folder }}/${{ inputs.project_folder }}/infra
+      /usr/bin/git config --global --add safe.directory /home/runner/work/${{ inputs.project_folder }}/infra
+      
+      echo "Cloning infra..."
+      export GITH_ACCESS_KEY="${{ inputs.github_access }}"
+      git clone https://$GITH_ACCESS_KEY@github.com/quangdhdev/infra.git infra
+      cd infra
+      
+      echo ${{ inputs.image_name}}
+      export DEPLOYMENT_FILE="${{ inputs.deployment_file }}"
+      export IMAGE_NAME="${{ inputs.image_name }}"
+      export POD_NAME="${{ inputs.pod_name }}"
+      /usr/local/bin/yq e -i '(select(.spec.template.spec.containers[].name == strenv(POD_NAME)) | .spec.template.spec.containers[].image) = strenv(IMAGE_NAME)' $DEPLOYMENT_FILE
+
+      git config --global user.email "devopt-bot@quangdh.dev"
+      git config --global user.name "devopt-bot"
+      git add $DEPLOYMENT_FILE
+      git commit -m "Update deployment to ${IMAGE_NAME}"
+      git push
