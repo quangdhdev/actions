@@ -11,6 +11,9 @@ inputs:
   target_build:
     description: "Target build"
     required: true
+  docker_name:
+    description: "Docker image name"
+    required: true
   # docker_file:
   #   description: "Docker file"
   #   required: false
@@ -40,7 +43,7 @@ runs:
     shell: bash
     id: dist
     run: |
-      echo "image_name=${{inputs.docker_username}}/${{ inputs.target_build }}:${{ steps.meta.outputs.tags }}" >> $GITHUB_OUTPUT
+      echo "image_name=${{inputs.docker_username}}/${{ inputs.docker_name }}:${{ steps.meta.outputs.tags }}" >> $GITHUB_OUTPUT
     
   - name: Build Docker images
     shell: bash
