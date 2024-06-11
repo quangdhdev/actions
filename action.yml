@@ -1,5 +1,5 @@
-name: setup-project
-description: for setting up node
+name: ga-setup-project
+description: customize for setting up node
 
 runs:
   using: "composite"
