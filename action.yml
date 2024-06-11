@@ -1,32 +1,57 @@
-name: nx-affected
-description: for setting up node
+name: Docker Hub - Building
+description: for building
+
+inputs:
+  docker_username:
+    description: "Docker username"
+    required: true
+  docker_password:
+    description: "Docker password"
+    required: true
+  target_build:
+    description: "Target build"
+    required: true
+  # docker_file:
+  #   description: "Docker file"
+  #   required: false
 
 outputs:
-  affected_projects:
-    description: "Affected projects"
-    value: ${{ steps.check_affected.outputs.affected_projects }}
-  has_affected:
-    description: "Has affected projects"
-    value: ${{ steps.check_affected.outputs.has_affected }}
+  image_name:
+    description: "Image name"
+    value: ${{ steps.dist.outputs.image_name }}
 
 runs:
   using: "composite"
   steps:
-    - name: Fetch all history for all tags and branches
-      shell: bash
-      run: git fetch --unshallow
+  - name: Login to DockerHub
+    uses: docker/login-action@v1 
+    with:
+      username: ${{ inputs.docker_username }}
+      password: ${{ inputs.docker_password }}
+  
+  - name: Docker meta
+    id: meta
+    uses: docker/metadata-action@v5
+    with:
+      tags: |
+        type=sha,enable=true,priority=100,prefix=sha-,suffix=,format=short
 
-    - name: Check affected
-      id: check_affected
-      shell: bash
-      run: |
-        npx --version
-        npx nx show projects --affected --base=HEAD~1 --json --withTarget=build > .affected-projects.json
-        if [[ -s .affected-projects.json ]] && ! grep -q '\[\]' .affected-projects.json; then
-          echo "has_affected=true" >> $GITHUB_OUTPUT
-          cat .affected-projects.json
-          echo "affected_projects=$(cat .affected-projects.json)" >> $GITHUB_OUTPUT
-        else
-          echo "has_affected=false" >> $GITHUB_OUTPUT
-          echo "No affected projects. Cancelling workflow."
-        fi
+  - name: Set image name
+    shell: bash
+    id: dist
+    run: |
+      echo "image_name=${{inputs.docker_username}}/${{ inputs.target_build }}:${{ steps.meta.outputs.tags }}" >> $GITHUB_OUTPUT
+    
+  - name: Build Docker images
+    shell: bash
+    run: npx nx build:docker ${{ inputs.target_build }} --args="--IMAGE_HOST=${{ inputs.docker_username }} --IMAGE_TAG=${{ steps.meta.outputs.tags }}"
+  
+  # - name: Build and push Docker image
+  #   uses: docker/build-push-action@v5
+  #   id: dist
+  #   with:
+  #     context: ${{ inputs.docker_file }}
+  #     push: true
+  #     tags: ${{ steps.name.outputs.image_name }}
+
+  
