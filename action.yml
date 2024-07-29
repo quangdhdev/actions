@@ -51,7 +51,7 @@ runs:
       
       echo "Cloning infra..."
       export GITH_ACCESS_KEY="${{ inputs.github_access }}"
-      git clone https://$GITH_ACCESS_KEY@github.com/quangdhdev/infra.git infra
+      git clone $GITH_ACCESS_KEY infra
       cd infra
       
       echo ${{ inputs.image_name}}
